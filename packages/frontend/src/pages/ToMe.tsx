@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { motion } from 'framer-motion'
 import { CapsuleCard, CapsuleData } from '../components/CapsuleCard'
-import { DRIFT_BOTTLE_ADDRESS, DRIFT_BOTTLE_ABI } from '../contracts/DriftBottle'
+import { DRIFT_BOTTLE_ADDRESS, DRIFT_BOTTLE_ABI, CHAIN } from '../contracts/DriftBottle'
 
 interface CapsuleWithMessage extends CapsuleData {
   message?: string
@@ -66,12 +66,16 @@ export function ToMe() {
   }
 
   const { writeContract, isPending: isWritePending, data: txHash } = useWriteContract()
-  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash })
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({
+    hash: txHash,
+    chainId: CHAIN.id,
+  })
 
   const handleOpenBottle = (capsule: CapsuleWithMessage) => {
     setOpeningId(capsule.id)
     writeContract(
       {
+        chain: CHAIN,
         address: DRIFT_BOTTLE_ADDRESS,
         abi: DRIFT_BOTTLE_ABI,
         functionName: 'open',

@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react'
-import { useAccount } from 'wagmi'
+import { useState, useEffect, useMemo } from 'react'
+import { useAccount, useSwitchChain } from 'wagmi'
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseEther } from 'viem'
 import { motion } from 'framer-motion'
-import { DRIFT_BOTTLE_ADDRESS, DRIFT_BOTTLE_ABI } from '../contracts/DriftBottle'
+import { DRIFT_BOTTLE_ADDRESS, DRIFT_BOTTLE_ABI, CHAIN } from '../contracts/DriftBottle'
 
-const LOCK_DURATIONS = [
+const PRESET_CUSTOM = '__custom__'
+
+const LOCK_PRESETS = [
   { label: '1 second (demo)', value: '1' },
   { label: '1 minute (demo)', value: '60' },
   { label: '1 month', value: String(30 * 24 * 60 * 60) },
@@ -15,18 +17,47 @@ const LOCK_DURATIONS = [
   { label: '5 years', value: String(5 * 365 * 24 * 60 * 60) },
 ]
 
+type CustomUnit = 's' | 'm' | 'h' | 'd' | 'w' | 'mo' | 'y'
+
+const CUSTOM_UNIT_SECONDS: Record<CustomUnit, bigint> = {
+  s: 1n,
+  m: 60n,
+  h: 3600n,
+  d: 86400n,
+  w: 604800n,
+  mo: 2592000n, // 30 days
+  y: 31536000n, // 365 days
+}
+
+function parseCustomLockSeconds(amount: string, unit: CustomUnit): bigint | null {
+  const trimmed = amount.trim()
+  if (!/^\d+$/.test(trimmed)) return null
+  const n = BigInt(trimmed)
+  if (n === 0n) return null
+  return n * CUSTOM_UNIT_SECONDS[unit]
+}
+
 export function WriteCapsule() {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, chain } = useAccount()
+  const { switchChainAsync } = useSwitchChain()
   const [message, setMessage] = useState('')
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount] = useState('')
-  const [lockDuration, setLockDuration] = useState(LOCK_DURATIONS[2].value)
+  const [lockDurationChoice, setLockDurationChoice] = useState(LOCK_PRESETS[2].value)
+  const [customLockAmount, setCustomLockAmount] = useState('1')
+  const [customLockUnit, setCustomLockUnit] = useState<CustomUnit>('d')
   const [capsuleId, setCapsuleId] = useState<string | null>(null)
 
-  const { writeContract, isPending: isWritePending, data: txHash } = useWriteContract()
+  const { writeContract, isPending: isWritePending, data: txHash, error: writeError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash: txHash,
+    chainId: CHAIN.id,
   })
+
+  const customLockSecondsPreview = useMemo(() => {
+    if (lockDurationChoice !== PRESET_CUSTOM) return null
+    return parseCustomLockSeconds(customLockAmount, customLockUnit)
+  }, [lockDurationChoice, customLockAmount, customLockUnit])
 
   useEffect(() => {
     if (isSuccess && txHash) {
@@ -34,7 +65,7 @@ export function WriteCapsule() {
     }
   }, [isSuccess, txHash])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!isConnected || !address) {
@@ -47,17 +78,36 @@ export function WriteCapsule() {
       return
     }
 
-    // Encode message as "demo:" + base64
-    const encodedMessage = 'demo:' + btoa(message)
+    try {
+      if (chain?.id !== CHAIN.id) {
+        await switchChainAsync({ chainId: CHAIN.id })
+      }
+    } catch {
+      alert(`Please switch your wallet to ${CHAIN.name} and try again.`)
+      return
+    }
 
-    // Convert amount to wei (0 if empty)
+    const encodedMessage = 'demo:' + btoa(message)
     const ethAmount = amount ? parseEther(amount) : 0n
 
+    let lockSeconds: bigint
+    if (lockDurationChoice === PRESET_CUSTOM) {
+      const parsed = parseCustomLockSeconds(customLockAmount, customLockUnit)
+      if (parsed === null) {
+        alert('Enter a positive whole number for the custom lock duration.')
+        return
+      }
+      lockSeconds = parsed
+    } else {
+      lockSeconds = BigInt(lockDurationChoice)
+    }
+
     writeContract({
+      chain: CHAIN,
       address: DRIFT_BOTTLE_ADDRESS,
       abi: DRIFT_BOTTLE_ABI,
       functionName: 'createCapsule',
-      args: [recipient as `0x${string}`, encodedMessage, encodedMessage, BigInt(lockDuration)],
+      args: [recipient as `0x${string}`, encodedMessage, encodedMessage, lockSeconds],
       value: ethAmount,
     })
   }
@@ -183,22 +233,67 @@ export function WriteCapsule() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
+            className="space-y-3"
           >
             <label className="block text-sm font-medium text-gray-200 mb-2">
               Lock Duration
             </label>
             <select
-              value={lockDuration}
-              onChange={(e) => setLockDuration(e.target.value)}
+              value={lockDurationChoice}
+              onChange={(e) => setLockDurationChoice(e.target.value)}
               className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-sky-400/50 focus:outline-none"
             >
-              {LOCK_DURATIONS.map((d) => (
+              {LOCK_PRESETS.map((d) => (
                 <option key={d.value} value={d.value} className="bg-ocean-900">
                   {d.label}
                 </option>
               ))}
+              <option value={PRESET_CUSTOM} className="bg-ocean-900">
+                Custom…
+              </option>
             </select>
+            {lockDurationChoice === PRESET_CUSTOM && (
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={customLockAmount}
+                  onChange={(e) => setCustomLockAmount(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Amount"
+                  className="w-full sm:flex-1 min-w-0 bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-sky-400/50 focus:outline-none font-mono text-sm"
+                />
+                <select
+                  value={customLockUnit}
+                  onChange={(e) => setCustomLockUnit(e.target.value as CustomUnit)}
+                  className="w-full sm:w-auto bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-sky-400/50 focus:outline-none"
+                >
+                  <option value="s" className="bg-ocean-900">seconds</option>
+                  <option value="m" className="bg-ocean-900">minutes</option>
+                  <option value="h" className="bg-ocean-900">hours</option>
+                  <option value="d" className="bg-ocean-900">days</option>
+                  <option value="w" className="bg-ocean-900">weeks</option>
+                  <option value="mo" className="bg-ocean-900">months (30 days)</option>
+                  <option value="y" className="bg-ocean-900">years (365 days)</option>
+                </select>
+              </div>
+            )}
+            {customLockSecondsPreview !== null && (
+              <p className="text-xs text-gray-500">
+                Lock period:{' '}
+                <span className="text-gray-400 font-mono">
+                  {customLockSecondsPreview.toString()} seconds
+                </span>{' '}
+                until the recipient can open (same length again until expiry).
+              </p>
+            )}
           </motion.div>
+
+          {writeError && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-sm text-red-300">
+              {writeError.message}
+            </div>
+          )}
 
           {/* Submit Button */}
           <motion.button
