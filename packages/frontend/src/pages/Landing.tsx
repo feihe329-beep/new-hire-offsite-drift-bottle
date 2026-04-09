@@ -32,24 +32,7 @@ export function Landing() {
         style={{
           position: 'absolute',
           inset: 0,
-          background: `
-            radial-gradient(ellipse 100% 55% at 50% 20%, rgba(90,40,180,0.55) 0%, transparent 70%),
-            radial-gradient(ellipse 70% 40% at 20% 45%, rgba(30,15,120,0.45) 0%, transparent 65%),
-            radial-gradient(ellipse 60% 35% at 80% 35%, rgba(15,50,200,0.35) 0%, transparent 65%),
-            radial-gradient(ellipse 50% 30% at 55% 60%, rgba(10,80,160,0.3) 0%, transparent 60%),
-            linear-gradient(180deg, #04001a 0%, #080230 22%, #0e0650 42%, #091060 52%, #060c48 68%, #020820 100%)
-          `,
-        }}
-      />
-
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: `
-            radial-gradient(ellipse 140% 25% at 50% 48%, rgba(120,80,255,0.18) 0%, transparent 100%),
-            radial-gradient(ellipse 80% 15% at 50% 48%, rgba(180,140,255,0.12) 0%, transparent 100%)
-          `,
+          background: `linear-gradient(180deg, #020c18 0%, #020c18 45%, #041830 65%, #062540 100%)`,
         }}
       />
 
@@ -354,8 +337,8 @@ export function Landing() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 flex flex-col items-center pointer-events-none"
-            style={{ paddingTop: '8vh' }}
+            className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+            style={{ paddingBottom: '10vh' }}
           >
             <motion.div
               initial={{ opacity: 0 }}
