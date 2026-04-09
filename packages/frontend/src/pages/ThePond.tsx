@@ -3,7 +3,7 @@ import { useReadContract, useReadContracts, useWriteContract, useWaitForTransact
 import { motion } from 'framer-motion'
 import { formatEther } from 'viem'
 import { CapsuleCard, CapsuleData } from '../components/CapsuleCard'
-import { DRIFT_BOTTLE_ADDRESS, DRIFT_BOTTLE_ABI } from '../contracts/DriftBottle'
+import { DRIFT_BOTTLE_ADDRESS, DRIFT_BOTTLE_ABI, CHAIN } from '../contracts/DriftBottle'
 
 const OPEN_PRICE = 1000000000000000n // 0.001 ETH
 
@@ -79,12 +79,16 @@ export function ThePond() {
   capsules.sort((a, b) => Number(b.ethAmount - a.ethAmount))
 
   const { writeContract, isPending: isWritePending, data: txHash } = useWriteContract()
-  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash })
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({
+    hash: txHash,
+    chainId: CHAIN.id,
+  })
 
   const handleOpenExpired = (capsule: CapsuleWithMessage) => {
     setOpeningId(capsule.id)
     writeContract(
       {
+        chain: CHAIN,
         address: DRIFT_BOTTLE_ADDRESS,
         abi: DRIFT_BOTTLE_ABI,
         functionName: 'openExpired',

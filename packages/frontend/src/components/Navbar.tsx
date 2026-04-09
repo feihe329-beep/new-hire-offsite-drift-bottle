@@ -1,11 +1,15 @@
 import { Link } from 'react-router-dom'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi'
+import { CHAIN } from '../contracts/DriftBottle'
 import { DriftBottleIcon } from './DriftBottleIcon'
 
 export function Navbar() {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, chain } = useAccount()
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
+  const { switchChain, isPending: isSwitching } = useSwitchChain()
+
+  const wrongNetwork = isConnected && chain?.id !== CHAIN.id
 
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
@@ -69,10 +73,10 @@ export function Navbar() {
             ) : (
               <button
                 onClick={() => {
-                  const injectedConnector = connectors.find((c) => c.id === 'injected')
-                  if (injectedConnector) {
-                    connect({ connector: injectedConnector })
-                  }
+                  const cb = connectors.find((c) => c.type === 'coinbaseWallet')
+                  const fallback = connectors.find((c) => c.type === 'injected')
+                  const connector = cb ?? fallback
+                  if (connector) connect({ connector })
                 }}
                 className="px-6 py-2 bg-gradient-to-r from-sky-400 to-indigo-400 text-white rounded-lg hover:shadow-lg hover:shadow-sky-500/50 transition font-medium text-sm"
               >
@@ -97,6 +101,22 @@ export function Navbar() {
             Pond
           </Link>
         </div>
+
+        {wrongNetwork && (
+          <div className="border-t border-amber-500/30 bg-amber-500/10 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-sm text-amber-100">
+            <span>
+              Your wallet is not on {CHAIN.name}. Switch before sending transactions.
+            </span>
+            <button
+              type="button"
+              onClick={() => switchChain({ chainId: CHAIN.id })}
+              disabled={isSwitching}
+              className="shrink-0 px-4 py-1.5 rounded-lg bg-amber-500/30 text-amber-50 hover:bg-amber-500/40 disabled:opacity-50 font-medium"
+            >
+              {isSwitching ? 'Switching…' : `Switch to ${CHAIN.name}`}
+            </button>
+          </div>
+        )}
       </div>
     </nav>
   )
