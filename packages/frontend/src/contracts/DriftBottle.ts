@@ -1,6 +1,7 @@
 import { baseSepolia } from 'viem/chains'
 
-export const DRIFT_BOTTLE_ADDRESS = '0x0000000000000000000000000000000000000000' as const
+export const DRIFT_BOTTLE_ADDRESS =
+  '0x702b9fD74beD415D90D347969FE58BA9aad75648' as const
 
 export const DRIFT_BOTTLE_ABI = [
   {
@@ -192,3 +193,5 @@ export const DRIFT_BOTTLE_ABI = [
 ] as const
 
 export const CHAIN = baseSepolia
+
+export const DRIFT_BOTTLE_DEPLOY_BLOCK = 39990042n
