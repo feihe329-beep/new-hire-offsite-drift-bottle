@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { formatEther } from 'viem'
 import { CapsuleCard, CapsuleData } from '../components/CapsuleCard'
@@ -11,9 +11,19 @@ interface CapsuleWithMessage extends CapsuleData {
   message?: string
 }
 
+function decodeMessage(cid: string): string {
+  if (cid.startsWith('demo:')) {
+    try {
+      return atob(cid.slice(5))
+    } catch {
+      return cid
+    }
+  }
+  return cid
+}
+
 export function ThePond() {
-  const [openingId, setOpeningId] = useState<bigint | null>(null)
-  const [revealedMessages, setRevealedMessages] = useState<Record<string, string>>({})
+  const queryClient = useQueryClient()
 
   const { data: totalCapsules } = useReadContract({
     address: DRIFT_BOTTLE_ADDRESS,
@@ -42,6 +52,12 @@ export function ThePond() {
       functionName: 'getState',
       args: [BigInt(i)],
     },
+    {
+      address: DRIFT_BOTTLE_ADDRESS,
+      abi: DRIFT_BOTTLE_ABI,
+      functionName: 'getPublicCID',
+      args: [BigInt(i)],
+    },
   ]).flat()
 
   const { data: results, isLoading } = useReadContracts({
@@ -53,14 +69,20 @@ export function ThePond() {
   const capsules: CapsuleWithMessage[] = []
   if (results) {
     for (let i = 0; i < total; i++) {
-      const capsuleRes = results[i * 2]
-      const stateRes = results[i * 2 + 1]
+      const capsuleRes = results[i * 3]
+      const stateRes = results[i * 3 + 1]
+      const cidRes = results[i * 3 + 2]
       if (capsuleRes.status !== 'success' || stateRes.status !== 'success') continue
       const state = stateRes.result as number
-      // Only show expired (2) capsules
       if (state !== 2) continue
       const [sender, recipient, unlockTime, expiryTime, ethAmount, opened] = capsuleRes.result as [string, string, bigint, bigint, bigint, boolean]
       const id = BigInt(i)
+
+      let message: string | undefined
+      if (cidRes.status === 'success' && cidRes.result) {
+        message = decodeMessage(cidRes.result as string)
+      }
+
       capsules.push({
         id,
         sender,
@@ -70,37 +92,32 @@ export function ThePond() {
         ethAmount,
         opened,
         state,
-        message: revealedMessages[id.toString()],
+        message,
       })
     }
   }
 
-  // Sort by ETH amount descending
   capsules.sort((a, b) => Number(b.ethAmount - a.ethAmount))
 
   const { writeContract, isPending: isWritePending, data: txHash } = useWriteContract()
-  const { isLoading: isConfirming } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash: txHash,
     chainId: CHAIN.id,
   })
 
+  if (isSuccess) {
+    queryClient.invalidateQueries()
+  }
+
   const handleOpenExpired = (capsule: CapsuleWithMessage) => {
-    setOpeningId(capsule.id)
-    writeContract(
-      {
-        chain: CHAIN,
-        address: DRIFT_BOTTLE_ADDRESS,
-        abi: DRIFT_BOTTLE_ABI,
-        functionName: 'openExpired',
-        args: [capsule.id],
-        value: openPrice ?? OPEN_PRICE,
-      },
-      {
-        onSuccess: () => {
-          setRevealedMessages((prev) => ({ ...prev, [capsule.id.toString()]: '(refresh to see message)' }))
-        },
-      }
-    )
+    writeContract({
+      chain: CHAIN,
+      address: DRIFT_BOTTLE_ADDRESS,
+      abi: DRIFT_BOTTLE_ABI,
+      functionName: 'openExpired',
+      args: [capsule.id],
+      value: openPrice ?? OPEN_PRICE,
+    })
   }
 
   return (
@@ -164,7 +181,7 @@ export function ThePond() {
                       ? {
                           label: `Open for ${openPrice ? formatEther(openPrice) : '0.001'} ETH`,
                           onClick: () => handleOpenExpired(capsule),
-                          loading: openingId === capsule.id && (isWritePending || isConfirming),
+                          loading: isWritePending || isConfirming,
                         }
                       : undefined
                   }
