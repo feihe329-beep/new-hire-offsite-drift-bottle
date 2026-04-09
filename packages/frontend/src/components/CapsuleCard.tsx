@@ -32,6 +32,8 @@ export function CapsuleCard({ capsule, action, showMessage, message }: CapsuleCa
         return { label: '✅ Valid', color: 'text-green-400' }
       case 2:
         return { label: '⏰ Expired', color: 'text-red-400' }
+      case 3:
+        return { label: '📭 Opened', color: 'text-sky-400' }
       default:
         return { label: '❓ Unknown', color: 'text-gray-400' }
     }
