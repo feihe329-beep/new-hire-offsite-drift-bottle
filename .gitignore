@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+packages/frontend/src/pages/*.js
+packages/frontend/src/pages/*.js.map
+packages/frontend/src/pages/*.d.ts
+packages/frontend/src/pages/*.d.ts.map
+packages/frontend/src/components/*.js
+packages/frontend/src/components/*.js.map
+packages/frontend/src/components/*.d.ts
+packages/frontend/src/components/*.d.ts.map
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Forge/Foundry
+cache/
+broadcast/
